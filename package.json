@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "tauri": "tauri",
+    "tauri:linux": "NO_STRIP=true tauri",
     "lint": "eslint .",
     "preview": "vite preview"
   },
