@@ -83,20 +83,88 @@ jobs:
         run: |
           echo "http://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories
           apk update
-          apk add --no-cache build-base webkit2gtk-4.1-dev openssl-dev curl wget file rust cargo nodejs npm gtk+3.0-dev librsvg-dev git bash zlib-dev gcompat
+          apk add --no-cache build-base webkit2gtk-4.1-dev openssl-dev curl wget file rust cargo nodejs npm gtk+3.0-dev librsvg-dev git bash zlib-dev alpine-sdk sudo
 
       - uses: actions/checkout@v4
 
       - name: install frontend dependencies
         run: npm ci
 
-      - uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build Alpine Binary
+        if: matrix.name == 'alpine'
+        run: |
+          npm run tauri build -- --no-bundle
+
+      - name: Get Version
+        id: version
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create APKBUILD and build .apk
+        if: matrix.name == 'alpine'
+        run: |
+          # Create a build user (abuild cannot run as root)
+          adduser -D builder
+          addgroup builder abuild
+          echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+          
+          # Create package directory
+          mkdir -p /home/builder/openconnect-companion
+          
+          # Copy binary
+          cp src-tauri/target/release/openconnect-companion-tauri /home/builder/openconnect-companion/
+          
+          # Create desktop file
+          cat > /home/builder/openconnect-companion/openconnect-companion.desktop << 'EOF'
+          [Desktop Entry]
+          Name=OpenConnect Companion
+          Comment=Open-source fitness data management tool
+          Exec=openconnect-companion-tauri
+          Icon=openconnect-companion
+          Terminal=false
+          Type=Application
+          Categories=Utility;
+          EOF
+          
+          # Create APKBUILD
+          cat > /home/builder/openconnect-companion/APKBUILD << EOF
+          # Maintainer: OpenConnectCompanion
+          pkgname=openconnect-companion
+          pkgver=${{ steps.version.outputs.version }}
+          pkgrel=0
+          pkgdesc="Open-source fitness data management tool"
+          url="https://github.com/KuboHA/OpenConnectCompanion-tauri"
+          arch="x86_64"
+          license="GPL-3.0"
+          depends="webkit2gtk-4.1 gtk+3.0 librsvg"
+          source=""
+          options="!check"
+          
+          package() {
+              install -Dm755 "\$startdir/openconnect-companion-tauri" "\$pkgdir/usr/bin/openconnect-companion-tauri"
+              install -Dm644 "\$startdir/openconnect-companion.desktop" "\$pkgdir/usr/share/applications/openconnect-companion.desktop"
+          }
+          EOF
+          
+          chown -R builder:builder /home/builder/openconnect-companion
+          
+          # Generate abuild keys and build
+          su builder -c "
+            cd /home/builder/openconnect-companion
+            abuild-keygen -a -i -n
+            abuild -F -r
+          "
+          
+          # Find and copy the built .apk
+          find /home/builder/packages -name '*.apk' -exec cp {} $GITHUB_WORKSPACE/openconnect-companion-${{ steps.version.outputs.version }}.apk \;
+
+      - name: Upload Alpine Release Asset
+        uses: softprops/action-gh-release@v2
         with:
-          tagName: app-v__VERSION__ 
-          releaseName: 'App v__VERSION__'
-          releaseBody: 'See the assets to download this version and install.'
-          releaseDraft: true
+          tag_name: app-v${{ steps.version.outputs.version }}
+          name: 'App v${{ steps.version.outputs.version }}'
+          draft: true
           prerelease: false
-          args: ${{ matrix.args }}
+          files: openconnect-companion-${{ steps.version.outputs.version }}.apk
