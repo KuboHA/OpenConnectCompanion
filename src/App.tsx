@@ -4,6 +4,7 @@ import Header from './components/Header';
 import Dashboard from './components/Dashboard';
 import WorkoutModal from './components/WorkoutModal';
 import ToastContainer from './components/ToastContainer';
+import SettingsModal from './components/SettingsModal';
 
 function Footer() {
   return (
@@ -11,7 +12,7 @@ function Footer() {
       <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6">
         <p className="text-center text-xs text-[var(--color-text-secondary)]">
           <a 
-            href="https://github.com/janmarkus-dev/OpenConnectCompanion" 
+            href="https://github.com/KuboHA/OpenConnectCompanion-tauri" 
             target="_blank" 
             rel="noopener noreferrer" 
             className="text-[var(--color-accent)] hover:underline"
@@ -45,6 +46,7 @@ function App() {
       </main>
       <Footer />
       {isModalOpen && <WorkoutModal />}
+      <SettingsModal />
       <ToastContainer />
     </div>
   );

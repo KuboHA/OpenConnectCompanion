@@ -3,6 +3,7 @@ export interface Workout {
   file_hash: string;
   filename: string;
   name: string | null;
+  notes: string | null;
   tags: string | null;
   workout_type: string | null;
   start_time: string | null;
@@ -27,6 +28,7 @@ export interface Workout {
 export interface WorkoutSummary {
   id: number;
   name: string | null;
+  notes: string | null;
   workout_type: string | null;
   start_time: string | null;
   duration_seconds: number | null;
@@ -193,4 +195,41 @@ export function capitalizeWorkoutType(type: string | null): string {
     .split('_')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
+}
+
+// Training metrics types
+
+export interface HRZoneTime {
+  zoneName: string;
+  zoneIndex: number;
+  timeSeconds: number;
+  percentage: number;
+  color: string;
+}
+
+export interface WorkoutTSS {
+  workoutId: number;
+  date: string;
+  tss: number;
+  trimp: number;
+  durationMinutes: number;
+  avgHR: number | null;
+}
+
+export interface TrainingLoadData {
+  atl: number; // Acute Training Load (7-day)
+  ctl: number; // Chronic Training Load (42-day)
+  tsb: number; // Training Stress Balance
+  weeklyTSS: number;
+  dailyTSS: WorkoutTSS[];
+}
+
+export interface RecoveryData {
+  status: 'recovered' | 'fresh' | 'optimal' | 'tired' | 'fatigued';
+  label: string;
+  color: string;
+  description: string;
+  tsb: number;
+  readinessScore: number; // 0-100
+  suggestedIntensity: 'rest' | 'easy' | 'moderate' | 'hard' | 'max';
 }

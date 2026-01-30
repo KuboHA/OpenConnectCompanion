@@ -39,6 +39,13 @@ interface WorkoutState {
   // Filters
   workoutTypeFilter: string | null;
   tagFilter: string | null;
+  searchQuery: string;
+  dateRangeStart: string | null;
+  dateRangeEnd: string | null;
+  minDistance: number | null;
+  maxDistance: number | null;
+  minDuration: number | null;
+  maxDuration: number | null;
   
   // Loading states
   isLoading: boolean;
@@ -66,10 +73,16 @@ interface WorkoutState {
   deleteWorkout: (id: number) => Promise<boolean>;
   renameWorkout: (id: number, name: string) => Promise<boolean>;
   updateTags: (id: number, tags: string[]) => Promise<boolean>;
+  updateNotes: (id: number, notes: string) => Promise<boolean>;
   
   setPage: (page: number) => void;
   setWorkoutTypeFilter: (type: string | null) => void;
   setTagFilter: (tag: string | null) => void;
+  setSearchQuery: (query: string) => void;
+  setDateRange: (start: string | null, end: string | null) => void;
+  setDistanceFilter: (min: number | null, max: number | null) => void;
+  setDurationFilter: (min: number | null, max: number | null) => void;
+  clearAllFilters: () => void;
   openModal: (workout: Workout) => void;
   closeModal: () => void;
 }
@@ -93,12 +106,19 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
   perPage: 15,
   workoutTypeFilter: null,
   tagFilter: null,
+  searchQuery: '',
+  dateRangeStart: null,
+  dateRangeEnd: null,
+  minDistance: null,
+  maxDistance: null,
+  minDuration: null,
+  maxDuration: null,
   isLoading: false,
   isUploading: false,
   isModalOpen: false,
 
   fetchWorkouts: async () => {
-    const { currentPage, perPage, workoutTypeFilter, tagFilter } = get();
+    const { currentPage, perPage, workoutTypeFilter, tagFilter, searchQuery, dateRangeStart, dateRangeEnd, minDistance, maxDistance, minDuration, maxDuration } = get();
     set({ isLoading: true });
     try {
       const response = await invoke<WorkoutsResponse>('get_workouts', {
@@ -106,6 +126,13 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         perPage,
         workoutType: workoutTypeFilter,
         tag: tagFilter,
+        search: searchQuery || null,
+        dateStart: dateRangeStart,
+        dateEnd: dateRangeEnd,
+        minDistance: minDistance ? minDistance * 1000 : null, // Convert km to meters
+        maxDistance: maxDistance ? maxDistance * 1000 : null,
+        minDuration: minDuration ? minDuration * 60 : null, // Convert minutes to seconds
+        maxDuration: maxDuration ? maxDuration * 60 : null,
       });
       set({
         workouts: response.workouts,
@@ -289,6 +316,19 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     }
   },
 
+  updateNotes: async (id: number, notes: string) => {
+    try {
+      const success = await invoke<boolean>('update_workout_notes', { id, notes });
+      if (success) {
+        get().fetchWorkout(id);
+      }
+      return success;
+    } catch (error) {
+      console.error('Failed to update notes:', error);
+      return false;
+    }
+  },
+
   setPage: (page: number) => {
     set({ currentPage: page });
     get().fetchWorkouts();
@@ -301,6 +341,42 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
 
   setTagFilter: (tag: string | null) => {
     set({ tagFilter: tag, currentPage: 1 });
+    get().fetchWorkouts();
+  },
+
+  setSearchQuery: (query: string) => {
+    set({ searchQuery: query, currentPage: 1 });
+    get().fetchWorkouts();
+  },
+
+  setDateRange: (start: string | null, end: string | null) => {
+    set({ dateRangeStart: start, dateRangeEnd: end, currentPage: 1 });
+    get().fetchWorkouts();
+  },
+
+  setDistanceFilter: (min: number | null, max: number | null) => {
+    set({ minDistance: min, maxDistance: max, currentPage: 1 });
+    get().fetchWorkouts();
+  },
+
+  setDurationFilter: (min: number | null, max: number | null) => {
+    set({ minDuration: min, maxDuration: max, currentPage: 1 });
+    get().fetchWorkouts();
+  },
+
+  clearAllFilters: () => {
+    set({
+      workoutTypeFilter: null,
+      tagFilter: null,
+      searchQuery: '',
+      dateRangeStart: null,
+      dateRangeEnd: null,
+      minDistance: null,
+      maxDistance: null,
+      minDuration: null,
+      maxDuration: null,
+      currentPage: 1,
+    });
     get().fetchWorkouts();
   },
 

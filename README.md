@@ -28,7 +28,39 @@ We provide AppImage and Debian packages:
 - **Performance Charts** for heart rate, speed, power, and cadence
 - **Personal Records** tracking
 - **Tag System** for organizing workouts
+- **Training Analytics**:
+  - **HR Zones**: Time-in-zone analysis based on configurable Heart Rate zones.
+  - **Training Load**: Tracks fitness (CTL), fatigue (ATL), and form (TSB).
+  - **Recovery Score**: Estimates readiness to train based on Training Stress Balance.
 - **Offline & Private**: SQLite database stored locally; no cloud upload required.
+
+## Training Metrics Explained
+
+OpenConnect Companion uses standard impulse-response models to estimate your fitness and fatigue.
+
+### Training Stress Score (TSS)
+TSS quantifies the workload of a single session. Since power meters are not always available, we estimate TSS using **Heart Rate Reserve (HRR)**:   
+$$ \text{HRR} = \frac{\text{Avg HR} - \text{Resting HR}}{\text{Max HR} - \text{Resting HR}} $$
+$$ \text{TSS} = (\text{Duration (hours)} \times \text{HRR}^2) \times 100 $$
+
+The specific stress score (TSS) for each individual workout is calculated using your Heart Rate Reserve (Max HR - Resting HR). If your resting heart rate drops as you get fitter, you should update it in Settings.
+
+### Acute Training Load (ATL) - "Fatigue"
+An exponentially weighted average of TSS over the last **7 days**. It represents how tired you are currently.
+
+### Chronic Training Load (CTL) - "Fitness"
+The system calculates a **42-day** rolling average of your training load. This represents your baseline "Fitness." As you train consistently over weeks, this number rises, effectively teaching the system that your body is accustomed to more work.
+
+### Training Stress Balance (TSB) - "Form"
+$$ \text{TSB} = \text{CTL} - \text{ATL} $$
+- **Positive (> +5)**: You are fresh and ready to perform ("tapered").
+- **Neutral (-10 to +5)**: Optimal training zone.
+- **Negative (< -10)**: You are accumulating fatigue (overreaching).
+- **Deep Negative (< -30)**: High risk of overtraining.
+
+A high-volume training week (high Fatigue) that would crush a beginner (low Fitness) might result in a TSB of -50 (Fatigued).
+However, for an athlete with high Fitness (high CTL), that same training week might only result in a TSB of -10 (Optimal).
+Because your Accumulated Fitness is subtracted from your Recent Fatigue, a fitter athlete can absorb much more training load while remaining in a "Recovered" or "Optimal" state.
 
 ## Building from Source
 

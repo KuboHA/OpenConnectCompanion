@@ -42,6 +42,13 @@ fn get_workouts(
     per_page: Option<i64>,
     workout_type: Option<String>,
     tag: Option<String>,
+    search: Option<String>,
+    date_start: Option<String>,
+    date_end: Option<String>,
+    min_distance: Option<f64>,
+    max_distance: Option<f64>,
+    min_duration: Option<i64>,
+    max_duration: Option<i64>,
 ) -> Result<WorkoutsResponse, String> {
     let page = page.unwrap_or(1);
     let per_page = per_page.unwrap_or(15);
@@ -52,11 +59,25 @@ fn get_workouts(
         offset,
         workout_type.as_deref(),
         tag.as_deref(),
+        search.as_deref(),
+        date_start.as_deref(),
+        date_end.as_deref(),
+        min_distance,
+        max_distance,
+        min_duration,
+        max_duration,
     ).map_err(|e| e.to_string())?;
 
     let total = state.db.get_total_workout_count(
         workout_type.as_deref(),
         tag.as_deref(),
+        search.as_deref(),
+        date_start.as_deref(),
+        date_end.as_deref(),
+        min_distance,
+        max_distance,
+        min_duration,
+        max_duration,
     ).map_err(|e| e.to_string())?;
 
     Ok(WorkoutsResponse {
@@ -110,6 +131,11 @@ fn rename_workout(state: State<AppState>, id: i64, name: String) -> Result<bool,
 fn update_workout_tags(state: State<AppState>, id: i64, tags: Vec<String>) -> Result<bool, String> {
     let tags_json = serde_json::to_string(&tags).map_err(|e| e.to_string())?;
     state.db.update_tags(id, &tags_json).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn update_workout_notes(state: State<AppState>, id: i64, notes: String) -> Result<bool, String> {
+    state.db.update_notes(id, &notes).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -322,6 +348,7 @@ pub fn run() {
             delete_workout,
             rename_workout,
             update_workout_tags,
+            update_workout_notes,
             get_stats,
             get_monthly_stats,
             get_streak_info,

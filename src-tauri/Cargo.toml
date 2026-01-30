@@ -1,6 +1,6 @@
 [package]
 name = "openconnect-companion-tauri"
-version = "0.1.0"
+version = "0.2.0"
 description = "Open-source fitness data management tool"
 authors = ["OpenConnectCompanion"]
 license = "GPL-3.0"

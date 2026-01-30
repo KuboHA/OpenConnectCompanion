@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   XAxis,
   YAxis,
@@ -5,8 +6,8 @@ import {
   Tooltip,
   Area,
   AreaChart,
-  Label,
 } from 'recharts';
+import { Activity, ChevronDown, ChevronUp } from 'lucide-react';
 import type { ChartData } from '../types';
 
 interface WorkoutChartsProps {
@@ -83,6 +84,7 @@ function downsampleData<T extends Record<string, unknown>>(
 }
 
 export default function WorkoutCharts({ chartData, onHover, workoutType }: WorkoutChartsProps) {
+  const [isExpanded, setIsExpanded] = useState(true);
   const isCycling = workoutType?.toLowerCase() === 'cycling';
 
   // Process data to include Time (seconds) and Distance (meters)
@@ -182,6 +184,14 @@ export default function WorkoutCharts({ chartData, onHover, workoutType }: Worko
     return null;
   }
 
+  const metricCount = chartConfig.length;
+  const statsGridClass = metricCount === 3
+    ? 'grid grid-cols-2 sm:grid-cols-3 gap-2'
+    : 'grid grid-cols-2 sm:grid-cols-4 gap-2';
+  const chartsGridClass = metricCount === 3
+    ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4'
+    : 'grid grid-cols-1 sm:grid-cols-2 gap-4';
+
   const handleMouseMove = (state: any) => {
     if (onHover && state?.activeTooltipIndex !== undefined && state.activeTooltipIndex !== null) {
        const point = data[state.activeTooltipIndex];
@@ -210,93 +220,130 @@ export default function WorkoutCharts({ chartData, onHover, workoutType }: Worko
   };
 
   return (
-    <div className="space-y-4">
-      <h3 className="text-sm font-medium text-[var(--color-text-primary)]">Performance Charts</h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {chartConfig.map((config) => (
-          <div
-            key={config.key}
-            className="bg-[var(--color-bg-secondary)] rounded-lg p-4"
-          >
-            <h4 className="text-xs font-medium text-[var(--color-text-secondary)] mb-2">
-              {config.title}
-            </h4>
-            <div className="h-[140px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart 
-                  data={data}
-                  onMouseMove={handleMouseMove}
-                  onMouseLeave={handleMouseLeave}
-                  margin={{ top: 5, right: 10, left: 0, bottom: 20 }}
-                >
-                  <defs>
-                    <linearGradient id={`gradient-${config.key}`} x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={config.color} stopOpacity={0.3} />
-                      <stop offset="95%" stopColor={config.color} stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <XAxis 
-                    dataKey={xAxisKey}
-                    type="number" 
-                    tick={{ fill: 'var(--color-text-secondary)', fontSize: 10 }}
-                    tickFormatter={formatXAxis}
-                    axisLine={{ stroke: 'var(--color-border)' }}
-                    tickLine={{ stroke: 'var(--color-border)' }}
-                    interval="preserveStartEnd"
-                    domain={['dataMin', 'dataMax']}
-                  >
-                    <Label 
-                      value={xAxisLabel}
-                      position="bottom" 
-                      offset={0}
-                      style={{ fill: 'var(--color-text-secondary)', fontSize: 10 }}
-                    />
-                  </XAxis>
-                  <YAxis
-                    tick={{ fill: 'var(--color-text-secondary)', fontSize: 10 }}
-                    domain={[config.domain.min, config.domain.max]}
-                    axisLine={{ stroke: 'var(--color-border)' }}
-                    tickLine={{ stroke: 'var(--color-border)' }}
-                    width={35}
-                  >
-                    <Label 
-                      value={config.yLabel} 
-                      angle={-90} 
-                      position="insideLeft"
-                      style={{ fill: 'var(--color-text-secondary)', fontSize: 10, textAnchor: 'middle' }}
-                    />
-                  </YAxis>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'var(--color-bg-card)',
-                      border: '1px solid var(--color-border)',
-                      borderRadius: '8px',
-                      fontSize: '12px',
-                    }}
-                    itemStyle={{
-                      color: 'var(--color-text-primary)',
-                    }}
-                    formatter={(value) => [
-                      `${Number(value)?.toFixed(1)} ${config.unit}`,
-                      config.title,
-                    ]}
-                    labelFormatter={(label) => formatXAxis(label)}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey={config.key}
-                    stroke={config.color}
-                    strokeWidth={2}
-                    fill={`url(#gradient-${config.key})`}
-                    dot={false}
-                    connectNulls
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+    <div className="card p-4">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center justify-between cursor-pointer"
+      >
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-emerald-900/30 flex items-center justify-center">
+            <Activity className="w-4 h-4 text-emerald-400" />
           </div>
-        ))}
-      </div>
+          <h3 className="text-sm font-medium text-[var(--color-text-primary)]">Performance Charts</h3>
+          <span className="text-xs text-[var(--color-text-secondary)]">
+            ({chartConfig.length} metrics)
+          </span>
+        </div>
+        {isExpanded ? (
+          <ChevronUp className="w-4 h-4 text-[var(--color-text-secondary)]" />
+        ) : (
+          <ChevronDown className="w-4 h-4 text-[var(--color-text-secondary)]" />
+        )}
+      </button>
+
+      {isExpanded && (
+        <div className="mt-4 space-y-4">
+          {/* Stats row */}
+          <div className={statsGridClass}>
+            {chartConfig.map((config) => {
+              const values = fullData.map(d => d[config.key as keyof typeof fullData[0]]).filter((v): v is number => v !== null && typeof v === 'number');
+              const avg = values.length > 0 ? Math.round(values.reduce((a, b) => a + b, 0) / values.length) : 0;
+              const max = values.length > 0 ? Math.round(Math.max(...values)) : 0;
+              return (
+                <div key={config.key} className="bg-[var(--color-bg-secondary)] rounded-lg p-2 text-center">
+                  <p className="text-xs text-[var(--color-text-secondary)]">{config.title}</p>
+                  <p className="text-sm font-bold" style={{ color: config.color }}>{avg} <span className="text-xs font-normal">avg</span></p>
+                  <p className="text-xs text-[var(--color-text-secondary)]">{max} max</p>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Charts */}
+          <div className={chartsGridClass}>
+            {chartConfig.map((config) => (
+              <div key={config.key} className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: config.color }}></div>
+                  <span className="text-xs text-[var(--color-text-secondary)]">{config.title}</span>
+                </div>
+                <div className="h-36">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart 
+                      data={data}
+                      onMouseMove={handleMouseMove}
+                      onMouseLeave={handleMouseLeave}
+                    >
+                      <defs>
+                        <linearGradient id={`gradient-${config.key}`} x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={config.color} stopOpacity={0.8} />
+                          <stop offset="100%" stopColor={config.color} stopOpacity={0.1} />
+                        </linearGradient>
+                      </defs>
+                      <XAxis 
+                        dataKey={xAxisKey}
+                        type="number" 
+                        tick={{ fill: 'var(--color-text-secondary)', fontSize: 10 }}
+                        tickFormatter={formatXAxis}
+                        axisLine={false}
+                        tickLine={false}
+                        interval="preserveStartEnd"
+                        domain={['dataMin', 'dataMax']}
+                        label={{ 
+                          value: xAxisLabel, 
+                          position: 'right', 
+                          offset: -5,
+                          style: { fontSize: 10, fill: 'var(--color-text-secondary)' }
+                        }}
+                      />
+                      <YAxis
+                        tick={{ fill: 'var(--color-text-secondary)', fontSize: 10 }}
+                        domain={[config.domain.min, config.domain.max]}
+                        axisLine={false}
+                        tickLine={false}
+                        width={40}
+                        tickCount={5}
+                        tickFormatter={(v) => `${Math.round(Number(v))}${config.unit === 'bpm' ? '' : config.unit === 'W' ? '' : ''}`}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'var(--color-bg-card)',
+                          border: '1px solid var(--color-border)',
+                          borderRadius: '8px',
+                          fontSize: '12px',
+                        }}
+                        itemStyle={{
+                          color: 'var(--color-text-primary)',
+                        }}
+                        formatter={(value) => [
+                          `${Number(value)?.toFixed(1)} ${config.unit}`,
+                          config.title,
+                        ]}
+                        labelFormatter={(label) => formatXAxis(label)}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey={config.key}
+                        stroke={config.color}
+                        strokeWidth={2}
+                        fill={`url(#gradient-${config.key})`}
+                        dot={false}
+                        connectNulls
+                        activeDot={{
+                          r: 6,
+                          fill: config.color,
+                          stroke: 'var(--color-bg-card)',
+                          strokeWidth: 2,
+                        }}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

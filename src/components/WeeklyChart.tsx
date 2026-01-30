@@ -103,21 +103,23 @@ const getSQLiteWeekNum = (d: Date) => {
         </div>
       </div>
       
-      <div className="flex-1 min-h-[80px] max-h-[120px]">
+      <div className="flex-1 min-h-[120px] -ml-4">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+          <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
             <XAxis
               dataKey="week"
               tick={{ fill: 'var(--color-text-secondary)', fontSize: 10 }}
               axisLine={false}
               tickLine={false}
+              dy={5}
             />
             <YAxis
               tick={{ fill: 'var(--color-text-secondary)', fontSize: 10 }}
               axisLine={false}
               tickLine={false}
-              domain={[0, Math.max(maxCount + 1, Math.ceil(avgValue) + 2)]}
+              domain={[0, Math.max(maxCount + 1, Math.ceil(avgValue) + 1)]}
               allowDecimals={false}
+              width={30}
             />
             <Tooltip
               contentStyle={{

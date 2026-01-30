@@ -1,6 +1,7 @@
-import { Upload, FolderUp } from 'lucide-react';
+import { Upload, FolderUp, Settings } from 'lucide-react';
 import { useWorkoutStore } from '../stores/workoutStore';
 import { useToastStore } from '../stores/toastStore';
+import { useSettingsStore } from '../stores/settingsStore';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
 import type { UploadResult } from '../types';
@@ -8,6 +9,7 @@ import type { UploadResult } from '../types';
 export default function Header() {
   const { uploadFiles, isUploading, fetchDashboardData } = useWorkoutStore();
   const addToast = useToastStore((state) => state.addToast);
+  const openSettings = useSettingsStore((state) => state.openSettings);
 
   const handleUploadFiles = async () => {
     try {
@@ -108,6 +110,15 @@ export default function Header() {
             >
               <FolderUp className="w-4 h-4 sm:mr-2" />
               <span className="hidden sm:inline">Folder</span>
+            </button>
+
+            {/* Settings Button */}
+            <button
+              onClick={openSettings}
+              className="cursor-pointer inline-flex items-center px-3 py-2 text-sm font-medium rounded-lg text-[var(--color-text-primary)] bg-[var(--color-bg-secondary)] hover:bg-[var(--color-border)] transition-colors"
+              title="Training Settings"
+            >
+              <Settings className="w-4 h-4" />
             </button>
           </div>
         </div>

@@ -4,6 +4,8 @@ import ActivityChart from './ActivityChart';
 import WeeklyChart from './WeeklyChart';
 import PersonalRecordsCard from './PersonalRecordsCard';
 import WorkoutList from './WorkoutList';
+import TrainingLoadCard from './TrainingLoadCard';
+import RecoveryScoreCard from './RecoveryScoreCard';
 
 export default function Dashboard() {
   return (
@@ -14,18 +16,26 @@ export default function Dashboard() {
       {/* Row 2: Activity Grid (full width) */}
       <ContributionCalendar />
 
-      {/* Row 3: Analytics + Personal Records */}
+      {/* Row 3: Analytics + Personal Records + Training Metrics */}
       <div className="col-span-6 lg:col-span-3">
         <ActivityChart />
       </div>
       <div className="col-span-6 lg:col-span-3">
         <WeeklyChart />
       </div>
-      <div className="col-span-12 lg:col-span-6">
+      <div className="col-span-6 lg:col-span-3">
+        <TrainingLoadCard />
+      </div>
+      <div className="col-span-6 lg:col-span-3">
+        <RecoveryScoreCard />
+      </div>
+
+      {/* Row 4: Personal Records (full width) */}
+      <div className="col-span-12">
         <PersonalRecordsCard />
       </div>
 
-      {/* Row 4: Recent Workouts (full width) */}
+      {/* Row 5: Recent Workouts (full width) */}
       <div className="col-span-12">
         <WorkoutList />
       </div>

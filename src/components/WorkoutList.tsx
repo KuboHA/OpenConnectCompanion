@@ -1,4 +1,4 @@
-import { Filter, X } from 'lucide-react';
+import { Filter, X, Search, Calendar, Clock, MapPin } from 'lucide-react';
 import { useWorkoutStore } from '../stores/workoutStore';
 import { invoke } from '@tauri-apps/api/core';
 import type { Workout } from '../types';
@@ -10,7 +10,7 @@ import {
   capitalizeWorkoutType,
   getActivityColor,
 } from '../types';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 export default function WorkoutList() {
   const {
@@ -20,17 +20,52 @@ export default function WorkoutList() {
     perPage,
     workoutTypeFilter,
     tagFilter,
+    searchQuery,
+    dateRangeStart,
+    dateRangeEnd,
+    minDistance,
+    maxDistance,
+    minDuration,
+    maxDuration,
     activityBreakdown,
     allTags,
     isLoading,
     setPage,
     setWorkoutTypeFilter,
     setTagFilter,
+    setSearchQuery,
+    setDateRange,
+    setDistanceFilter,
+    setDurationFilter,
+    clearAllFilters,
     openModal,
   } = useWorkoutStore();
 
   const [showFilters, setShowFilters] = useState(false);
+  const [localSearch, setLocalSearch] = useState(searchQuery);
+  const [localDateStart, setLocalDateStart] = useState(dateRangeStart || '');
+  const [localDateEnd, setLocalDateEnd] = useState(dateRangeEnd || '');
+  const [localMinDistance, setLocalMinDistance] = useState(minDistance?.toString() || '');
+  const [localMaxDistance, setLocalMaxDistance] = useState(maxDistance?.toString() || '');
+  const [localMinDuration, setLocalMinDuration] = useState(minDuration?.toString() || '');
+  const [localMaxDuration, setLocalMaxDuration] = useState(maxDuration?.toString() || '');
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const totalPages = Math.ceil(totalWorkouts / perPage);
+
+  // Debounced search
+  useEffect(() => {
+    if (searchTimeout.current) {
+      clearTimeout(searchTimeout.current);
+    }
+    searchTimeout.current = setTimeout(() => {
+      if (localSearch !== searchQuery) {
+        setSearchQuery(localSearch);
+      }
+    }, 300);
+    return () => {
+      if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    };
+  }, [localSearch, searchQuery, setSearchQuery]);
 
   const handleWorkoutClick = async (workoutId: number) => {
     try {
@@ -43,12 +78,32 @@ export default function WorkoutList() {
     }
   };
 
-  const clearFilters = () => {
-    setWorkoutTypeFilter(null);
-    setTagFilter(null);
+  const applyMetricFilters = () => {
+    setDateRange(localDateStart || null, localDateEnd || null);
+    setDistanceFilter(
+      localMinDistance ? parseFloat(localMinDistance) : null,
+      localMaxDistance ? parseFloat(localMaxDistance) : null
+    );
+    setDurationFilter(
+      localMinDuration ? parseFloat(localMinDuration) : null,
+      localMaxDuration ? parseFloat(localMaxDuration) : null
+    );
   };
 
-  const hasActiveFilters = workoutTypeFilter !== null || tagFilter !== null;
+  const clearFilters = () => {
+    setLocalSearch('');
+    setLocalDateStart('');
+    setLocalDateEnd('');
+    setLocalMinDistance('');
+    setLocalMaxDistance('');
+    setLocalMinDuration('');
+    setLocalMaxDuration('');
+    clearAllFilters();
+  };
+
+  const hasActiveFilters = workoutTypeFilter !== null || tagFilter !== null || searchQuery !== '' || 
+    dateRangeStart !== null || dateRangeEnd !== null || minDistance !== null || maxDistance !== null ||
+    minDuration !== null || maxDuration !== null;
 
   return (
     <div className="card p-4">
@@ -85,9 +140,119 @@ export default function WorkoutList() {
         </div>
       </div>
 
+      {/* Search Bar */}
+      <div className="mb-3">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-text-secondary)]" />
+          <input
+            type="text"
+            value={localSearch}
+            onChange={(e) => setLocalSearch(e.target.value)}
+            placeholder="Search workouts by name, notes, or tags..."
+            className="w-full pl-9 pr-3 py-2 text-sm bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+          />
+          {localSearch && (
+            <button
+              onClick={() => { setLocalSearch(''); setSearchQuery(''); }}
+              className="cursor-pointer absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Expandable Filter Section */}
       {showFilters && (
-        <div className="mb-4 p-3 bg-[var(--color-bg-secondary)] rounded-lg space-y-3">
+        <div className="mb-4 p-3 bg-[var(--color-bg-secondary)] rounded-lg space-y-4">
+          {/* Date Range Filter */}
+          <div>
+            <div className="flex items-center gap-1 mb-2">
+              <Calendar className="w-3 h-3 text-[var(--color-text-secondary)]" />
+              <span className="text-xs text-[var(--color-text-secondary)]">Date Range:</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={localDateStart}
+                onChange={(e) => setLocalDateStart(e.target.value)}
+                className="flex-1 px-2 py-1.5 text-xs bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-md text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+              />
+              <span className="text-xs text-[var(--color-text-secondary)]">to</span>
+              <input
+                type="date"
+                value={localDateEnd}
+                onChange={(e) => setLocalDateEnd(e.target.value)}
+                className="flex-1 px-2 py-1.5 text-xs bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-md text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+              />
+            </div>
+          </div>
+
+          {/* Distance Filter */}
+          <div>
+            <div className="flex items-center gap-1 mb-2">
+              <MapPin className="w-3 h-3 text-[var(--color-text-secondary)]" />
+              <span className="text-xs text-[var(--color-text-secondary)]">Distance (km):</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                value={localMinDistance}
+                onChange={(e) => setLocalMinDistance(e.target.value)}
+                placeholder="Min"
+                min="0"
+                step="0.1"
+                className="flex-1 px-2 py-1.5 text-xs bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-md text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+              />
+              <span className="text-xs text-[var(--color-text-secondary)]">to</span>
+              <input
+                type="number"
+                value={localMaxDistance}
+                onChange={(e) => setLocalMaxDistance(e.target.value)}
+                placeholder="Max"
+                min="0"
+                step="0.1"
+                className="flex-1 px-2 py-1.5 text-xs bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-md text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+              />
+            </div>
+          </div>
+
+          {/* Duration Filter */}
+          <div>
+            <div className="flex items-center gap-1 mb-2">
+              <Clock className="w-3 h-3 text-[var(--color-text-secondary)]" />
+              <span className="text-xs text-[var(--color-text-secondary)]">Duration (minutes):</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                value={localMinDuration}
+                onChange={(e) => setLocalMinDuration(e.target.value)}
+                placeholder="Min"
+                min="0"
+                className="flex-1 px-2 py-1.5 text-xs bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-md text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+              />
+              <span className="text-xs text-[var(--color-text-secondary)]">to</span>
+              <input
+                type="number"
+                value={localMaxDuration}
+                onChange={(e) => setLocalMaxDuration(e.target.value)}
+                placeholder="Max"
+                min="0"
+                className="flex-1 px-2 py-1.5 text-xs bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-md text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+              />
+            </div>
+          </div>
+
+          {/* Apply Button for metric filters */}
+          <button
+            onClick={applyMetricFilters}
+            className="w-full cursor-pointer px-3 py-1.5 text-xs font-medium bg-[var(--color-accent)] text-white rounded-md hover:opacity-90 transition-opacity"
+          >
+            Apply Filters
+          </button>
+
+          <div className="border-t border-[var(--color-border)] pt-3">
           {/* Activity Type Filter */}
           <div>
             <span className="text-xs text-[var(--color-text-secondary)] block mb-2">Activity Type:</span>
@@ -156,6 +321,7 @@ export default function WorkoutList() {
               </div>
             </div>
           )}
+          </div>
         </div>
       )}
 

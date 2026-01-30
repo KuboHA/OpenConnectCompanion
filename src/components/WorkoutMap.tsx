@@ -72,27 +72,41 @@ export default function WorkoutMap({ gpsData, highlightedIndex }: WorkoutMapProp
     ? positions[highlightedIndex]
     : null;
 
-  // Always use dark theme tile URL
-  const tileUrl = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+  // Custom dark theme tiles optimized for route visibility
+  const baseTileUrl = 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png';
+  const labelTileUrl = 'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png';
   const lineColor = '#38bdf8';
 
   return (
     <MapContainer
       center={center}
       zoom={13}
-      className="w-full h-full rounded-lg"
+      className="w-full h-full rounded-lg activity-map"
       scrollWheelZoom={true}
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-        url={tileUrl}
+        url={baseTileUrl}
+      />
+      <TileLayer
+        attribution=""
+        url={labelTileUrl}
+      />
+      {/* Route glow */}
+      <Polyline
+        positions={positions}
+        pathOptions={{
+          color: '#0ea5e9',
+          weight: 8,
+          opacity: 0.25,
+        }}
       />
       <Polyline
         positions={positions}
         pathOptions={{
           color: lineColor,
           weight: 4,
-          opacity: 0.8,
+          opacity: 0.9,
         }}
       />
       {/* Start marker - green */}

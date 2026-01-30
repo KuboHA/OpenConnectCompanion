@@ -1,4 +1,4 @@
-use rusqlite::{Connection, Result, params, Row};
+use rusqlite::{Connection, Result, params};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::Mutex;
@@ -9,6 +9,7 @@ pub struct Workout {
     pub file_hash: String,
     pub filename: String,
     pub name: Option<String>,
+    pub notes: Option<String>,
     pub tags: Option<String>,
     pub workout_type: Option<String>,
     pub start_time: Option<String>,
@@ -34,6 +35,7 @@ pub struct Workout {
 pub struct WorkoutSummary {
     pub id: i64,
     pub name: Option<String>,
+    pub notes: Option<String>,
     pub workout_type: Option<String>,
     pub start_time: Option<String>,
     pub duration_seconds: Option<i64>,
@@ -106,6 +108,7 @@ impl Database {
                 file_hash TEXT UNIQUE NOT NULL,
                 filename TEXT NOT NULL,
                 name TEXT,
+                notes TEXT,
                 tags TEXT,
                 workout_type TEXT,
                 start_time DATETIME,
@@ -131,6 +134,9 @@ impl Database {
             )",
             [],
         )?;
+
+        // Add notes column if it doesn't exist (migration for existing databases)
+        let _ = conn.execute("ALTER TABLE workouts ADD COLUMN notes TEXT", []);
 
         // Create index on common query fields
         conn.execute(
@@ -194,77 +200,106 @@ impl Database {
         Ok(conn.last_insert_rowid())
     }
 
-    pub fn get_workouts(&self, limit: i64, offset: i64, workout_type: Option<&str>, tag: Option<&str>) -> Result<Vec<WorkoutSummary>> {
+    #[allow(clippy::too_many_arguments)]
+    pub fn get_workouts(
+        &self, 
+        limit: i64, 
+        offset: i64, 
+        workout_type: Option<&str>, 
+        tag: Option<&str>,
+        search: Option<&str>,
+        date_start: Option<&str>,
+        date_end: Option<&str>,
+        min_distance: Option<f64>,
+        max_distance: Option<f64>,
+        min_duration: Option<i64>,
+        max_duration: Option<i64>,
+    ) -> Result<Vec<WorkoutSummary>> {
         let conn = self.conn.lock().unwrap();
         
-        let mut sql = String::from(
-            "SELECT id, name, workout_type, start_time, duration_seconds, distance_meters, total_calories, avg_heart_rate, tags 
-             FROM workouts WHERE 1=1"
-        );
+        let mut conditions = vec!["1=1".to_string()];
+        let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
         
-        if workout_type.is_some() {
-            sql.push_str(" AND workout_type = ?1");
+        if let Some(wt) = workout_type {
+            conditions.push("workout_type = ?".to_string());
+            params_vec.push(Box::new(wt.to_string()));
         }
-        if tag.is_some() {
-            if workout_type.is_some() {
-                sql.push_str(" AND tags LIKE ?2");
-            } else {
-                sql.push_str(" AND tags LIKE ?1");
+        
+        if let Some(t) = tag {
+            conditions.push("tags LIKE ?".to_string());
+            params_vec.push(Box::new(format!("%\"{}%", t)));
+        }
+        
+        if let Some(s) = search {
+            if !s.is_empty() {
+                conditions.push("(name LIKE ? OR notes LIKE ? OR tags LIKE ?)".to_string());
+                let pattern = format!("%{}%", s);
+                params_vec.push(Box::new(pattern.clone()));
+                params_vec.push(Box::new(pattern.clone()));
+                params_vec.push(Box::new(pattern));
             }
         }
-        sql.push_str(" ORDER BY start_time DESC LIMIT ?");
-        if workout_type.is_some() && tag.is_some() {
-            sql.push_str("3 OFFSET ?4");
-        } else if workout_type.is_some() || tag.is_some() {
-            sql.push_str("2 OFFSET ?3");
-        } else {
-            sql.push_str("1 OFFSET ?2");
+        
+        if let Some(ds) = date_start {
+            conditions.push("DATE(start_time) >= ?".to_string());
+            params_vec.push(Box::new(ds.to_string()));
         }
+        
+        if let Some(de) = date_end {
+            conditions.push("DATE(start_time) <= ?".to_string());
+            params_vec.push(Box::new(de.to_string()));
+        }
+        
+        if let Some(min_d) = min_distance {
+            conditions.push("distance_meters >= ?".to_string());
+            params_vec.push(Box::new(min_d));
+        }
+        
+        if let Some(max_d) = max_distance {
+            conditions.push("distance_meters <= ?".to_string());
+            params_vec.push(Box::new(max_d));
+        }
+        
+        if let Some(min_dur) = min_duration {
+            conditions.push("duration_seconds >= ?".to_string());
+            params_vec.push(Box::new(min_dur));
+        }
+        
+        if let Some(max_dur) = max_duration {
+            conditions.push("duration_seconds <= ?".to_string());
+            params_vec.push(Box::new(max_dur));
+        }
+        
+        params_vec.push(Box::new(limit));
+        params_vec.push(Box::new(offset));
+        
+        let sql = format!(
+            "SELECT id, name, notes, workout_type, start_time, duration_seconds, distance_meters, total_calories, avg_heart_rate, tags 
+             FROM workouts WHERE {} ORDER BY start_time DESC LIMIT ? OFFSET ?",
+            conditions.join(" AND ")
+        );
 
-        fn row_to_summary(row: &Row) -> rusqlite::Result<WorkoutSummary> {
+        let mut stmt = conn.prepare(&sql)?;
+        let params_refs: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+        
+        let rows = stmt.query_map(params_refs.as_slice(), |row| {
             Ok(WorkoutSummary {
                 id: row.get(0)?,
                 name: row.get(1)?,
-                workout_type: row.get(2)?,
-                start_time: row.get(3)?,
-                duration_seconds: row.get(4)?,
-                distance_meters: row.get(5)?,
-                total_calories: row.get(6)?,
-                avg_heart_rate: row.get(7)?,
-                tags: row.get(8)?,
+                notes: row.get(2)?,
+                workout_type: row.get(3)?,
+                start_time: row.get(4)?,
+                duration_seconds: row.get(5)?,
+                distance_meters: row.get(6)?,
+                total_calories: row.get(7)?,
+                avg_heart_rate: row.get(8)?,
+                tags: row.get(9)?,
             })
-        }
+        })?;
 
         let mut workouts = Vec::new();
-        
-        if let Some(wt) = workout_type {
-            if let Some(t) = tag {
-                let tag_pattern = format!("%\"{}%", t);
-                let mut stmt = conn.prepare(&sql)?;
-                let rows = stmt.query_map(params![wt, tag_pattern, limit, offset], row_to_summary)?;
-                for row in rows {
-                    workouts.push(row?);
-                }
-            } else {
-                let mut stmt = conn.prepare(&sql)?;
-                let rows = stmt.query_map(params![wt, limit, offset], row_to_summary)?;
-                for row in rows {
-                    workouts.push(row?);
-                }
-            }
-        } else if let Some(t) = tag {
-            let tag_pattern = format!("%\"{}%", t);
-            let mut stmt = conn.prepare(&sql)?;
-            let rows = stmt.query_map(params![tag_pattern, limit, offset], row_to_summary)?;
-            for row in rows {
-                workouts.push(row?);
-            }
-        } else {
-            let mut stmt = conn.prepare(&sql)?;
-            let rows = stmt.query_map(params![limit, offset], row_to_summary)?;
-            for row in rows {
-                workouts.push(row?);
-            }
+        for row in rows {
+            workouts.push(row?);
         }
 
         Ok(workouts)
@@ -273,7 +308,7 @@ impl Database {
     pub fn get_workout(&self, id: i64) -> Result<Option<Workout>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, file_hash, filename, name, tags, workout_type, start_time, end_time,
+            "SELECT id, file_hash, filename, name, notes, tags, workout_type, start_time, end_time,
                     duration_seconds, distance_meters, total_calories,
                     avg_heart_rate, max_heart_rate, avg_power_watts, max_power_watts,
                     avg_cadence, max_cadence, avg_speed_mps, max_speed_mps,
@@ -288,25 +323,26 @@ impl Database {
                 file_hash: row.get(1)?,
                 filename: row.get(2)?,
                 name: row.get(3)?,
-                tags: row.get(4)?,
-                workout_type: row.get(5)?,
-                start_time: row.get(6)?,
-                end_time: row.get(7)?,
-                duration_seconds: row.get(8)?,
-                distance_meters: row.get(9)?,
-                total_calories: row.get(10)?,
-                avg_heart_rate: row.get(11)?,
-                max_heart_rate: row.get(12)?,
-                avg_power_watts: row.get(13)?,
-                max_power_watts: row.get(14)?,
-                avg_cadence: row.get(15)?,
-                max_cadence: row.get(16)?,
-                avg_speed_mps: row.get(17)?,
-                max_speed_mps: row.get(18)?,
-                elevation_gain_meters: row.get(19)?,
-                elevation_loss_meters: row.get(20)?,
-                created_at: row.get(21)?,
-                updated_at: row.get(22)?,
+                notes: row.get(4)?,
+                tags: row.get(5)?,
+                workout_type: row.get(6)?,
+                start_time: row.get(7)?,
+                end_time: row.get(8)?,
+                duration_seconds: row.get(9)?,
+                distance_meters: row.get(10)?,
+                total_calories: row.get(11)?,
+                avg_heart_rate: row.get(12)?,
+                max_heart_rate: row.get(13)?,
+                avg_power_watts: row.get(14)?,
+                max_power_watts: row.get(15)?,
+                avg_cadence: row.get(16)?,
+                max_cadence: row.get(17)?,
+                avg_speed_mps: row.get(18)?,
+                max_speed_mps: row.get(19)?,
+                elevation_gain_meters: row.get(20)?,
+                elevation_loss_meters: row.get(21)?,
+                created_at: row.get(22)?,
+                updated_at: row.get(23)?,
             }))
         } else {
             Ok(None)
@@ -336,7 +372,7 @@ impl Database {
     pub fn get_workout_by_date(&self, date: &str) -> Result<Option<Workout>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, file_hash, filename, name, tags, workout_type, start_time, end_time,
+            "SELECT id, file_hash, filename, name, notes, tags, workout_type, start_time, end_time,
                     duration_seconds, distance_meters, total_calories,
                     avg_heart_rate, max_heart_rate, avg_power_watts, max_power_watts,
                     avg_cadence, max_cadence, avg_speed_mps, max_speed_mps,
@@ -351,25 +387,26 @@ impl Database {
                 file_hash: row.get(1)?,
                 filename: row.get(2)?,
                 name: row.get(3)?,
-                tags: row.get(4)?,
-                workout_type: row.get(5)?,
-                start_time: row.get(6)?,
-                end_time: row.get(7)?,
-                duration_seconds: row.get(8)?,
-                distance_meters: row.get(9)?,
-                total_calories: row.get(10)?,
-                avg_heart_rate: row.get(11)?,
-                max_heart_rate: row.get(12)?,
-                avg_power_watts: row.get(13)?,
-                max_power_watts: row.get(14)?,
-                avg_cadence: row.get(15)?,
-                max_cadence: row.get(16)?,
-                avg_speed_mps: row.get(17)?,
-                max_speed_mps: row.get(18)?,
-                elevation_gain_meters: row.get(19)?,
-                elevation_loss_meters: row.get(20)?,
-                created_at: row.get(21)?,
-                updated_at: row.get(22)?,
+                notes: row.get(4)?,
+                tags: row.get(5)?,
+                workout_type: row.get(6)?,
+                start_time: row.get(7)?,
+                end_time: row.get(8)?,
+                duration_seconds: row.get(9)?,
+                distance_meters: row.get(10)?,
+                total_calories: row.get(11)?,
+                avg_heart_rate: row.get(12)?,
+                max_heart_rate: row.get(13)?,
+                avg_power_watts: row.get(14)?,
+                max_power_watts: row.get(15)?,
+                avg_cadence: row.get(16)?,
+                max_cadence: row.get(17)?,
+                avg_speed_mps: row.get(18)?,
+                max_speed_mps: row.get(19)?,
+                elevation_gain_meters: row.get(20)?,
+                elevation_loss_meters: row.get(21)?,
+                created_at: row.get(22)?,
+                updated_at: row.get(23)?,
             }))
         } else {
             Ok(None)
@@ -396,6 +433,15 @@ impl Database {
         let affected = conn.execute(
             "UPDATE workouts SET tags = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
             params![tags, id],
+        )?;
+        Ok(affected > 0)
+    }
+
+    pub fn update_notes(&self, id: i64, notes: &str) -> Result<bool> {
+        let conn = self.conn.lock().unwrap();
+        let affected = conn.execute(
+            "UPDATE workouts SET notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            params![notes, id],
         )?;
         Ok(affected > 0)
     }
@@ -629,31 +675,81 @@ impl Database {
         Ok(tags)
     }
 
-    pub fn get_total_workout_count(&self, workout_type: Option<&str>, tag: Option<&str>) -> Result<i64> {
+    #[allow(clippy::too_many_arguments)]
+    pub fn get_total_workout_count(
+        &self, 
+        workout_type: Option<&str>, 
+        tag: Option<&str>,
+        search: Option<&str>,
+        date_start: Option<&str>,
+        date_end: Option<&str>,
+        min_distance: Option<f64>,
+        max_distance: Option<f64>,
+        min_duration: Option<i64>,
+        max_duration: Option<i64>,
+    ) -> Result<i64> {
         let conn = self.conn.lock().unwrap();
         
-        let mut sql = String::from("SELECT COUNT(*) FROM workouts WHERE 1=1");
+        let mut conditions = vec!["1=1".to_string()];
+        let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
         
-        if workout_type.is_some() {
-            sql.push_str(" AND workout_type = ?");
-        }
-        if tag.is_some() {
-            sql.push_str(" AND tags LIKE ?");
-        }
-
         if let Some(wt) = workout_type {
-            if let Some(t) = tag {
-                let tag_pattern = format!("%\"{}%", t);
-                conn.query_row(&sql, params![wt, tag_pattern], |row| row.get(0))
-            } else {
-                conn.query_row(&sql, params![wt], |row| row.get(0))
-            }
-        } else if let Some(t) = tag {
-            let tag_pattern = format!("%\"{}%", t);
-            conn.query_row(&sql, params![tag_pattern], |row| row.get(0))
-        } else {
-            conn.query_row(&sql, [], |row| row.get(0))
+            conditions.push("workout_type = ?".to_string());
+            params_vec.push(Box::new(wt.to_string()));
         }
+        
+        if let Some(t) = tag {
+            conditions.push("tags LIKE ?".to_string());
+            params_vec.push(Box::new(format!("%\"{}%", t)));
+        }
+        
+        if let Some(s) = search {
+            if !s.is_empty() {
+                conditions.push("(name LIKE ? OR notes LIKE ? OR tags LIKE ?)".to_string());
+                let pattern = format!("%{}%", s);
+                params_vec.push(Box::new(pattern.clone()));
+                params_vec.push(Box::new(pattern.clone()));
+                params_vec.push(Box::new(pattern));
+            }
+        }
+        
+        if let Some(ds) = date_start {
+            conditions.push("DATE(start_time) >= ?".to_string());
+            params_vec.push(Box::new(ds.to_string()));
+        }
+        
+        if let Some(de) = date_end {
+            conditions.push("DATE(start_time) <= ?".to_string());
+            params_vec.push(Box::new(de.to_string()));
+        }
+        
+        if let Some(min_d) = min_distance {
+            conditions.push("distance_meters >= ?".to_string());
+            params_vec.push(Box::new(min_d));
+        }
+        
+        if let Some(max_d) = max_distance {
+            conditions.push("distance_meters <= ?".to_string());
+            params_vec.push(Box::new(max_d));
+        }
+        
+        if let Some(min_dur) = min_duration {
+            conditions.push("duration_seconds >= ?".to_string());
+            params_vec.push(Box::new(min_dur));
+        }
+        
+        if let Some(max_dur) = max_duration {
+            conditions.push("duration_seconds <= ?".to_string());
+            params_vec.push(Box::new(max_dur));
+        }
+        
+        let sql = format!(
+            "SELECT COUNT(*) FROM workouts WHERE {}",
+            conditions.join(" AND ")
+        );
+
+        let params_refs: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+        conn.query_row(&sql, params_refs.as_slice(), |row| row.get(0))
     }
 }
 

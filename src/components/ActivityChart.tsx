@@ -28,20 +28,20 @@ export default function ActivityChart() {
 
   return (
     <div className="card p-4 h-full flex flex-col">
-      <h3 className="text-sm font-semibold text-[var(--color-text-primary)] mb-3">
+      <h3 className="text-sm font-semibold text-[var(--color-text-primary)] mb-2">
         Activity Types
       </h3>
-      <div className="flex items-center gap-4 flex-1">
-        {/* Compact pie chart */}
-        <div className="relative w-28 h-28 flex-shrink-0">
+      <div className="flex flex-col flex-1 min-h-[120px]">
+        {/* Chart */}
+        <div className="flex-1 w-full min-h-0 relative">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
                 data={data}
                 cx="50%"
                 cy="50%"
-                innerRadius={28}
-                outerRadius={48}
+                innerRadius="60%"
+                outerRadius="90%"
                 paddingAngle={2}
                 dataKey="value"
                 stroke="none"
@@ -70,15 +70,15 @@ export default function ActivityChart() {
           </ResponsiveContainer>
         </div>
         
-        {/* Legend on the right */}
-        <div className="flex flex-col gap-1 text-xs">
+        {/* Legend */}
+        <div className="grid grid-cols-2 gap-x-2 gap-y-1 mt-2 text-xs">
           {data.map((item) => (
             <div key={item.name} className="flex items-center gap-2">
               <div
                 className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
                 style={{ backgroundColor: item.color }}
               />
-              <span className="text-[var(--color-text-secondary)]">{item.name}</span>
+              <span className="text-[var(--color-text-secondary)] truncate">{item.name}</span>
               <span className="text-[var(--color-text-primary)] font-medium ml-auto">{item.value}</span>
             </div>
           ))}
