@@ -84,7 +84,7 @@ jobs:
         run: |
           echo "http://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories
           apk update
-          apk add --no-cache build-base webkit2gtk-4.1-dev openssl-dev curl wget file rust cargo nodejs npm gtk+3.0-dev librsvg-dev git bash zlib-dev alpine-sdk sudo
+          apk add --no-cache build-base webkit2gtk-4.1-dev openssl-dev curl wget file rust cargo nodejs npm gtk+3.0-dev librsvg-dev git bash zlib-dev alpine-sdk sudo icu-libs icu-data-full
 
       - uses: actions/checkout@v4
 
