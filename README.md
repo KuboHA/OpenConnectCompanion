@@ -1,8 +1,5 @@
-# OpenConnect Companion
-
-**OpenConnectCompanion-Tauri** is a cross-platform native desktop application for synchronizing, analyzing, and visualizing data from Garmin smartwatches, cycling computers, and Strava Activities.
-
-It aims to provide a feature set identical to **Garmin Connect™**, while staying lightweight, fully open-source, and free from unnecessary bloat. OpenConnectCompanion is privacy-first (all data stays on your device) and does not rely on any Garmin services.
+# OpenConnectCompanion
+> is a cross-platform native desktop application for synchronizing, analyzing, and visualizing data from Garmin smartwatches, cycling computers, and Strava Activities. It aims to provide a feature set identical to **Garmin Connect™**, while staying lightweight, fully open-source, and free from unnecessary bloat. OpenConnectCompanion is privacy-first (all data stays on your device) and does not rely on any Garmin services.
 
 ## Installation
 
@@ -19,7 +16,7 @@ The easiest way to install OpenConnect Companion is to download the latest relea
 ### Linux
 We provide AppImage and Debian packages:
 - **AppImage**: Download the `.AppImage` file, make it executable (`chmod +x OpenConnect_Companion_*.AppImage`), and run it.
-- **Debian/Ubuntu**: Download the `.deb` file and install it using `sudo dpkg -i OpenConnect_Companion_*.deb` or your package manager.
+- **Debian, Ubuntu**: Download the `.deb` file and install it using `sudo dpkg -i OpenConnect_Companion_*.deb` or your package manager.
 - **Fedora, Centos, Suse, Mandrake, Red Hat**: Download the `.rpm` file and install it using `sudo yum install OpenConnect_Companion_*.rpm`
 - **Alpine Linux**: Download the `.apk` file and install it using `doas apk add OpenConnect_Companion_*.apk --allow-untrusted`
 
@@ -72,23 +69,11 @@ Because your Accumulated Fitness is subtracted from your Recent Fatigue, a fitte
 
 ## Building from Source
 
-If you prefer to build the application yourself or want to contribute, follow these steps.
-
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) (v18+)
 - [Rust](https://rustup.rs/) (latest stable)
 - [Tauri Prerequisites](https://tauri.app/v1/guides/getting-started/prerequisites)
-
-### Development
-
-```bash
-# Install dependencies
-npm install
-
-# Run in development mode
-npm run tauri dev
-```
 
 ### Building
 
